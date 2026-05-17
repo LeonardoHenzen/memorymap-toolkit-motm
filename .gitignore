@@ -23,6 +23,8 @@ Network Trash Folder
 Temporary Items
 .apdisk
 
+# Local data
+data/
 
 ### Python ###
 # Byte-compiled / optimized / DLL files

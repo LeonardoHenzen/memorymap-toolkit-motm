@@ -126,7 +126,8 @@ def __str__(self):
 # This class contains all the People linked to the Project
 class Person(models.Model):
     # External archive identifiers
-    identifier = models.CharField(max_length=100, unique=True)
+    identifier = models.CharField(max_length=100, unique=True, null=True, blank=True,
+    db_index=True)
 
     given_name = models.CharField(max_length=100)
     family_name = models.CharField(max_length=100)
@@ -169,12 +170,23 @@ class Person(models.Model):
 
     def __str__(self):
         return f"{self.given_name} {self.family_name}"
-    
+
+# This class contains all RelationshipType
+class RelationshipType(models.Model):
+    name = models.CharField(max_length=50, unique=True)
+    original_label = models.CharField(max_length=100, blank=True)
+
+    def __str__(self):
+        return self.name
+        
 # This class contains all Relationship among People
 class Relationship(models.Model):
-    # Type of relationship (e.g., mother, father, spouse, etc.)
-    # Martin: forse da creare classe con tutte le possibili relazioni...
-    relationship_type = models.CharField(max_length=50)
+    
+    relationship_type = models.ForeignKey(
+        "RelationshipType",
+        on_delete=models.CASCADE,
+        related_name="relationships"
+    )
 
     # Start and end of the relationship (if applicable)
     start_date = models.DateField(null=True, blank=True)
@@ -213,6 +225,12 @@ class Interview(models.Model):
 
     # Recording identifier (e.g., audio/video file ID)
     recording_id = models.CharField(max_length=100, blank=True)
+
+    interview_type = models.CharField(max_length=100, blank=True)
+
+    date = models.DateField(null=True, blank=True)
+
+    place = models.CharField(max_length=200, blank=True)
 
     description = models.TextField(blank=True)
 

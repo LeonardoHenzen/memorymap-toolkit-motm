@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'mmt_map',
     'mmt_pages',
     'mmt_api',
+    'mmt_motm',
     # 3rd Party
     'easy_thumbnails',
     'rest_framework',
