@@ -1,5 +1,3 @@
-version: '3.4'
-
 # For use in development only. Starts two containers - one for MMT, one for postgres
 # with volumes for the /app directory and the postgres data. /app dir mapped means that
 # changes to the code reloads MMT.
@@ -20,6 +18,11 @@ services:
     env_file:
       - .env
     platform: linux/amd64
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready --username=${DJANGO_DB_USER} --dbname=${DJANGO_DB_NAME}"]
+      start_period: 10s
+    restart: always
+
   memorymaptoolkit:
     image: memorymaptoolkit
     build:
@@ -30,8 +33,11 @@ services:
       - media:/app/media
       - backups:/app/backups
       - .:/app
+
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+
     command: python manage.py runserver 0.0.0.0:8000 --settings=memorymap_toolkit.settings.local
     ports:
       - 8000:8000
@@ -49,6 +55,9 @@ services:
       - DJANGO_DB_HOST=${DJANGO_DB_HOST}
       - DJANGO_SETTINGS_MODULE=memorymap_toolkit.settings.local
       # byHen: aggiunta riga per poter utilizzare la shell nel container
+    
+    restart: always
+
 volumes:
   postgres_data:
   static:
