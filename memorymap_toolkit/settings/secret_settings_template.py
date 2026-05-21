@@ -21,8 +21,8 @@ DATABASES = {
 }
 
 # If you want to use Google Analytics to monitor traffic to your site, put your tracking code here
-GOOGLE_ANALYTICS_PROPERTY_ID = ''
 
+GOOGLE_ANALYTICS_PROPERTY_ID = ''
 
 # Uncomment the lines below if you've enabled SSL for your site. Not strictly secret settings, but kept here so they are kept out of version control.
 
