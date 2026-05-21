@@ -185,6 +185,15 @@ def parse_timespan(raw: Any) -> Timespan:
 
     >>> parse_timespan("-")
     Timespan(start=None, end=None)
+
+    >>> parse_timespan("1928-1932")
+    Timespan(start=datetime.date(1928, 1, 1), end=datetime.date(1932, 12, 31))
+
+    >>> parse_timespan("1936-38")
+    Timespan(start=datetime.date(1936, 1, 1), end=datetime.date(1938, 12, 31))
+    
+    >>> parse_timespan("1938-194?")
+    Timespan(start=datetime.date(1938, 1, 1), end=datetime.date(1949, 12, 31))
     """
     if not raw:
         return Timespan()
@@ -228,7 +237,25 @@ def parse_timespan(raw: Any) -> Timespan:
     m = re.search(r"\s*–\s*", s_clean)
     if m:
         return try_range(s_clean[: m.start()], s_clean[m.end() :])
-
+    
+    # YYYY-YYYY (plain year range like 1928-1932)
+    m = re.fullmatch(r"(\d{4})-(\d{4})", s_clean)
+    if m:
+        return Timespan(date(int(m.group(1)), 1, 1), date(int(m.group(2)), 12, 31))
+    
+    # YYYY-YY (short end year like 1936-38 → 1936-1938)
+    m = re.fullmatch(r"(\d{4})-(\d{2})", s_clean)
+    if m:
+        century = m.group(1)[:2]
+        end_year = int(century + m.group(2))
+        return Timespan(date(int(m.group(1)), 1, 1), date(end_year, 12, 31))
+    
+    # YYYY-YYY? (fuzzy short end year like 1938-194? → 1938 to 1940–1949)
+    m = re.fullmatch(r"(\d{4})-(\d{3})\?", s_clean)
+    if m:
+        end_decade = int(m.group(2) + "0")
+        return Timespan(date(int(m.group(1)), 1, 1), date(end_decade + 9, 12, 31))
+    
     # Hyphen — separator only if followed by space or letter (protects ISO dates)
     m = re.search(r"-\s+|-(?=[A-Za-zÄÖÜäöü])", s_clean)
     if m:
