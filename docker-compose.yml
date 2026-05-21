@@ -33,12 +33,16 @@ services:
       - media:/app/media
       - backups:/app/backups
       - .:/app
-
     depends_on:
       db:
         condition: service_healthy
-
-    command: python manage.py runserver 0.0.0.0:8000 --settings=memorymap_toolkit.settings.local
+    command: >
+      bash -c "
+        python manage.py migrate && \
+        (python manage.py createsuperuser --noinput || echo 'Assuming preexisting user and continuing...') && \
+        python manage.py collectstatic --noinput && \
+        python manage.py runserver 0.0.0.0:8000
+      "
     ports:
       - 8000:8000
     env_file:
@@ -55,7 +59,8 @@ services:
       - DJANGO_DB_HOST=${DJANGO_DB_HOST}
       - DJANGO_SETTINGS_MODULE=memorymap_toolkit.settings.local
       # byHen: aggiunta riga per poter utilizzare la shell nel container
-    
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000')"]
     restart: always
 
 volumes:

@@ -30,7 +30,8 @@ USER appuser
 RUN mkdir -p static media logs backups
 
 # Copy secret settings
-RUN cp memorymap_toolkit/settings/secret_settings_template.py memorymap_toolkit/settings/secret_settings.py
+# this is better done via compose volume
+# RUN cp memorymap_toolkit/settings/secret_settings_template.py memorymap_toolkit/settings/secret_settings.py
 
 # Start command
 CMD ["python3", "manage.py", "runserver", "0.0.0.0:8000"]
