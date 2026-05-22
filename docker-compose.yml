@@ -38,7 +38,22 @@ services:
       db:
         condition: service_healthy
 
-    command: python manage.py runserver 0.0.0.0:8000 --settings=memorymap_toolkit.settings.local
+    #command: python manage.py runserver 0.0.0.0:8000 --settings=memorymap_toolkit.settings.local
+    
+    command: >
+      bash -c "
+        python manage.py migrate &&
+        (
+          python manage.py createsuperuser --noinput ||
+          echo 'Superuser already exists, continuing...'
+        ) &&
+        (
+          python manage.py collectstatic --noinput ||
+          echo 'Collectstatic failed, continuing...'
+        ) &&
+        python manage.py runserver 0.0.0.0:8000 --settings=memorymap_toolkit.settings.local
+      "
+
     ports:
       - 8000:8000
     env_file:
