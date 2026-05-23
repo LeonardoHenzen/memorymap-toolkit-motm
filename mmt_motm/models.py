@@ -73,7 +73,15 @@ class LocationPoint(models.Model):
 
     def __str__(self):
         return self.current_name
-    
+
+# This class contains all the various event type
+class EventType(models.Model):
+    code = models.CharField(max_length=50)
+    label = models.CharField(max_length=255)
+
+    def __str__(self):
+        return self.label
+
 # This class contains all the various Events from a person life that are registered
 class Event(models.Model):
     
@@ -81,6 +89,18 @@ class Event(models.Model):
     end_time = models.DateTimeField(null=True, blank=True)
 
     description = models.TextField(blank=True)
+
+    event_label = models.CharField(max_length=255, blank=True)
+
+    event_type = models.ForeignKey(
+        "EventType",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
+
+    place_type = models.CharField(max_length=100, blank=True)
+    place_category = models.CharField(max_length=255, blank=True)
 
     # Source URLs or references
     urls = models.ManyToManyField(
@@ -118,10 +138,11 @@ class Event(models.Model):
         related_name="events"
     )
 
-def __str__(self):
-    if self.end_time:
-        return f"Event {self.start_time} – {self.end_time}"
-    return f"Event at {self.start_time}"
+    def __str__(self):
+        if self.end_time:
+            return f"Event from {self.start_time:%Y-%m-%d %H:%M} to {self.end_time:%Y-%m-%d %H:%M}"
+        return f"Event at {self.start_time:%Y-%m-%d %H:%M}"
+
     
 # This class contains all the People linked to the Project
 class Person(models.Model):

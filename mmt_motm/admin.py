@@ -8,6 +8,7 @@ from .models import (
     LocationRegion,
     LocationPoint,
     Event,
+    EventType,
     Person,
     Relationship,
     Interview,
@@ -131,4 +132,5 @@ class RelationshipTypeAdmin(admin.ModelAdmin):
     ordering = ("name",)
 
 admin.site.register(URL)
+admin.site.register(EventType)
 admin.site.register(Event)
