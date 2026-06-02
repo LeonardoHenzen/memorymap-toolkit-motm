@@ -5,6 +5,9 @@ import os
 import json
 
 from django.contrib.gis.geos import Point
+from datetime import datetime
+from django.utils.timezone import make_aware
+from django.utils.timezone import is_naive
 
 from mmt_motm.models import (
     Person, 
@@ -13,8 +16,11 @@ from mmt_motm.models import (
     LocationPoint, 
     LocationRegion, 
     RelationshipType,
+    LocationPoint,
+    EventType,
+    Event,
+    URL,
 )
-
 
 # =======================================================
 # UTILS
@@ -116,6 +122,14 @@ RELATIONSHIP_MAP = {
         "base": "cousin",
 }
 
+def parse_event_date(date_str):
+    if not date_str:
+        return None
+    try:
+        dt = datetime.fromisoformat(date_str)
+        return make_aware(dt)
+    except Exception:
+        return None
 
 # =======================================================
 # PERSON MATCHING
@@ -404,9 +418,8 @@ def import_from_file(path):
 
     return person
 
-
 # =======================================================
-# IMPORT ALL
+# IMPORT ALL METADATI FILES
 # =======================================================
 def import_all(directory="data/parsed"):
 
@@ -431,3 +444,359 @@ def import_all(directory="data/parsed"):
     print(f"\n✅ Imported {len(results)} valid records")
 
     return results
+
+# ==========================================================
+# IMPORT Locations from JSON into DB
+# NB: Returns a cache: {location_id: LocationPoint instance}
+# ==========================================================
+def import_locations(locations_dict):
+
+    cache = {}
+
+    for loc_id, data in locations_dict.items():
+
+        # ==========================
+        # EXTRACT IDS
+        # ==========================
+        wikidata_id = None
+        geonames_id = None
+
+        if loc_id.startswith("wd_"):
+            wikidata_id = loc_id.replace("wd_", "")
+
+        elif loc_id.startswith("geo_"):
+            geonames_id = loc_id.replace("geo_", "")
+
+        # ==========================
+        # MATCH EXISTING
+        # ==========================
+        location = None
+
+        if wikidata_id:
+            location = LocationPoint.objects.filter(
+                wikidata_id=wikidata_id
+            ).first()
+
+        elif geonames_id:
+            location = LocationPoint.objects.filter(
+                geonames_id=geonames_id
+            ).first()
+
+        # fallback (by name)
+        if not location and data.get("name"):
+            location = LocationPoint.objects.filter(
+                current_name=data["name"]
+            ).first()
+
+        lat = data.get("lat")
+        lon = data.get("lon")
+
+        point = None
+        if lat is not None and lon is not None:
+            point = Point(lon, lat)
+
+        current_name = data.get("name")
+        postal_address = data.get("resolved_name") or ""
+
+        # ---- alternate names ----
+        alt_names = []
+        if data.get("name") and data.get("resolved_name"):
+            if data["name"] not in data["resolved_name"]:
+                alt_names.append(data["name"])
+
+        alternate_names = "; ".join(alt_names) if alt_names else ""
+
+        source = data.get("source")
+        description_parts = []
+        if source:
+            description_parts.append(f"source: {source}")
+
+        if wikidata_id:
+            description_parts.append(f"wikidata: {wikidata_id}")
+        if geonames_id:
+            description_parts.append(f"geonames: {geonames_id}")
+
+        description = " | ".join(description_parts)
+
+        # ==========================
+        # CREATE IF NOT EXISTS
+        # ==========================
+        if not location:
+
+            location = LocationPoint.objects.create(
+                current_name=current_name,
+                postal_address = data.get("resolved_name") or "",
+                alternate_names=alternate_names,
+                description=description,
+                location=point,
+                wikidata_id=wikidata_id,
+                geonames_id=geonames_id,
+            )
+
+        else:
+            # ==========================
+            # UPDATE EXISTING (safe enrich)
+            # ==========================
+            updated = False
+
+            # coordinates
+            if not location.location and point:
+                location.location = point
+                updated = True
+
+            # postal address
+            if not location.postal_address and postal_address:
+                location.postal_address = postal_address
+                updated = True
+
+            # identifiers
+            if wikidata_id and not location.wikidata_id:
+                location.wikidata_id = wikidata_id
+                updated = True
+
+            if geonames_id and not location.geonames_id:
+                location.geonames_id = geonames_id
+                updated = True
+
+            # description (append if new info)
+            if description:
+                existing_desc = location.description or ""
+                if description not in existing_desc:
+                    location.description = (
+                        existing_desc + " | " + description
+                        if existing_desc else description
+                    )
+                    updated = True
+
+            if updated:
+                location.save()
+
+        # ==========================
+        # CACHE
+        # ==========================
+        cache[loc_id] = location
+
+    return cache
+
+# ==========================================================
+# IMPORT Events type from JSON into DB
+# ==========================================================
+def get_or_create_event_type(code):
+
+    if not code:
+        return None
+    code_clean = code.lower().strip()
+    obj, _ = EventType.objects.get_or_create(
+        code=code_clean,
+        defaults={"label": code_clean}
+    )
+    return obj
+
+# ==========================================================
+# IMPORT Events from JSON into DB
+# ==========================================================
+from datetime import datetime
+
+from mmt_motm.models import Event, EventType, URL
+
+
+# ==========================
+# DATE PARSER (STRICT)
+# ==========================
+def parse_event_date(date_str):
+
+    if not date_str:
+        return None
+
+    try:
+        # accetta SOLO date complete (YYYY-MM-DD)
+        return datetime.fromisoformat(date_str)
+    except:
+        return None
+
+
+# ==========================
+# EVENT TYPE
+# ==========================
+def get_or_create_event_type(code):
+
+    if not code:
+        return None
+
+    code_clean = code.lower().strip()
+
+    obj, _ = EventType.objects.get_or_create(
+        code=code_clean,
+        defaults={"label": code_clean.capitalize()}
+    )
+
+    return obj
+
+
+# ==========================
+# IMPORT EVENTS
+# ==========================
+def import_events(events, location_cache, person):
+
+    results = []
+    for ev in events:
+
+        # DATE
+        start_time = parse_event_date(ev.get("date"))
+        start_time = (make_aware(start_time) if start_time and is_naive(start_time) else start_time)
+
+        date_original = ev.get("date_original") or ""
+        is_confirmed = ev.get("date_certainty") == "certain"
+
+        # LOCATION
+        location_id = ev.get("location_id")
+        location = location_cache.get(location_id)
+        if not location:
+            print("Missing location:", location_id)
+            
+        # EVENT TYPE
+        event_type = get_or_create_event_type(ev.get("event_type"))
+
+        # LABEL (short description)
+        event_label = ev.get("event_label") or ""
+
+        # DESCRIPTION (note + extra)
+        desc_parts = []
+        if ev.get("notes"):
+            desc_parts.append(ev["notes"])
+
+        description = " | ".join(desc_parts)
+        
+        if start_time:
+            existing = Event.objects.filter(
+                persons=person,
+                event_type=event_type,
+                start_time=start_time,
+                start_location=location,
+            ).first()
+        else:
+            existing = Event.objects.filter(
+                persons=person,
+                event_type=event_type,
+                start_time__isnull=True,
+                date_original=date_original,
+                start_location=location,
+            ).first()
+
+        # CREATE EVENT
+        if existing:
+            event = existing
+            
+            # ---- PERSON ----
+            if person not in event.persons.all():
+                event.persons.add(person)
+
+            # ---- URLS (merge) ----
+            for url in ev.get("external_links", []):
+                url_obj, _ = URL.objects.get_or_create(url=url)
+                if url_obj not in event.urls.all():
+                    event.urls.add(url_obj)
+
+            # ---- DESCRIPTION (merge soft) ----
+            if description and description not in (event.description or ""):
+                event.description = (
+                    (event.description or "") + " | " + description
+                ).strip(" | ")
+                event.save()
+
+        else:
+            event = Event.objects.create(
+                start_time=start_time,
+                date_original=date_original,
+                description=description,
+                event_label=event_label,
+                event_type=event_type,
+                place_type=ev.get("place_type") or "",
+                place_category=ev.get("place_category") or "",
+                start_location=location,
+                is_confirmed=is_confirmed,
+            )
+
+            # PERSON LINK
+            event.persons.add(person)
+
+            # URLS
+            for url in ev.get("external_links", []):
+                url_obj, _ = URL.objects.get_or_create(url=url)
+                event.urls.add(url_obj)
+
+        results.append(event)
+
+    return results
+
+# =====================================
+# IMPORT EVENTS FILES: Location, Event
+# =====================================
+def import_events_file(events_path, locations_path):
+
+    events_data = load_json(events_path)
+    locations_data = load_json(locations_path)
+
+    try:
+        # PERSON
+        person_data = events_data.get("person", {})
+        identifier = person_data.get("id")
+        if not identifier:
+            print("Missing person id")
+            return None
+        try:
+            # Person mast exixt in DB
+            person = Person.objects.get(identifier=identifier)
+        except Person.DoesNotExist:
+            print(f"Person not found: {identifier}")
+            return None
+
+        # LOCATIONS 
+        location_cache = import_locations(locations_data)
+
+        # EVENTS
+        events = events_data.get("events", [])
+        event_objs = import_events(events, location_cache, person)
+
+        print(f"Imported {len(event_objs)} events")
+
+        events_new_path = events_path.replace(".json", "_loaded.json")
+        locations_new_path = locations_path.replace(".json", "_loaded.json")
+
+        os.rename(events_path, events_new_path)
+        os.rename(locations_path, locations_new_path)
+
+        return event_objs
+
+    except Exception as e:
+        print(f"ERROR: {e}")
+        return None
+    
+"""
+# Just for Location import test
+def test_import_locations(path="data/eventi/parsed/locations.json"):
+
+    data = load_json(path)
+
+    print(f"Loading {len(data)} locations...\n")
+
+    cache = import_locations(data)
+
+    print("\n--- SAMPLE CHECK ---")
+
+    for i, (loc_id, loc) in enumerate(cache.items()):
+        if i >= 10:
+            break
+
+        print(f"\nID: {loc_id}")
+        print(f"  current_name: {loc.current_name}")
+        print(f"  postal_address: {loc.postal_address}")
+        print(f"  wikidata_id: {loc.wikidata_id}")
+        print(f"  geonames_id: {loc.geonames_id}")
+        print(f"  location: {loc.location}")
+        print(f"  description: {loc.description}")
+
+    print("\n✅ Test completed.")
+
+    return cache
+"""

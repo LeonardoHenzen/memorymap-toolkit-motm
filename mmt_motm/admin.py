@@ -131,6 +131,28 @@ class RelationshipTypeAdmin(admin.ModelAdmin):
     list_display = ("name", "original_label")
     ordering = ("name",)
 
+@admin.register(Event)
+class EventAdmin(admin.ModelAdmin):
+    list_display = (
+        "get_person","event_label", "event_type", "get_date", "date_original",
+    )
+    list_filter = (
+        "event_type",
+    )
+    search_fields = (
+        "persons__given_name", "event_label", "event_type__code", "date_original",
+    )
+    raw_id_fields = ("start_location", "persons")
+    ordering = ("persons__id", "id", "-start_time",)
+
+    def get_person(self, obj):
+        p = obj.persons.first()
+        return str(p) if p else "-"
+    get_person.short_description = "Person"
+
+    def get_date(self, obj):
+        return obj.start_time.date() if obj.start_time else None
+    get_date.short_description = "Date"
+
 admin.site.register(URL)
 admin.site.register(EventType)
-admin.site.register(Event)

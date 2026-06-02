@@ -10,6 +10,13 @@ File code: xlsx_event_reader.py
     Procedure: read_raw_person_sheet(input_dir="data/eventi",output_dir="data/eventi/parsed") 
             Event and location data extraction from file *.xlsx (using chronotopoi)
 
+File code: db_import.py
+    Procedure: import_all(directory="data/parsed")
+        Import Person in DB from parsed json file
+    Procedure: import_events_file("data/eventi/parsed/xy.events.json",
+           "data/eventi/parsed/locations.json")
+        Import Event in DB from parsed json file (event and location)
+
 Launch example: (directly from code or ) from
  $ docker compose exec memorymaptoolkit bash
  /app$ python manage.py shell

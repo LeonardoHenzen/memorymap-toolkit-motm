@@ -85,8 +85,10 @@ class EventType(models.Model):
 # This class contains all the various Events from a person life that are registered
 class Event(models.Model):
     
-    start_time = models.DateTimeField()
+    start_time = models.DateTimeField(null=True, blank=True)
     end_time = models.DateTimeField(null=True, blank=True)
+    # to use when start_time is uncertain:
+    date_original = models.CharField(max_length=100, blank=True)
 
     description = models.TextField(blank=True)
 
@@ -139,9 +141,13 @@ class Event(models.Model):
     )
 
     def __str__(self):
-        if self.end_time:
+        if self.start_time and self.end_time:
             return f"Event from {self.start_time:%Y-%m-%d %H:%M} to {self.end_time:%Y-%m-%d %H:%M}"
-        return f"Event at {self.start_time:%Y-%m-%d %H:%M}"
+        if self.start_time:
+            return f"Event at {self.start_time:%Y-%m-%d %H:%M}"
+        if self.date_original:
+            return f"Event ({self.date_original})"
+        return f"Event {self.id}"
 
     
 # This class contains all the People linked to the Project
