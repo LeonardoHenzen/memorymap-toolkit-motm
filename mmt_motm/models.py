@@ -78,6 +78,8 @@ class LocationPoint(models.Model):
 class EventType(models.Model):
     code = models.CharField(max_length=50)
     label = models.CharField(max_length=255)
+    # For grouping different types for visualization pourpose only
+    category = models.CharField(max_length=50, blank=True, null=True)
 
     def __str__(self):
         return self.label

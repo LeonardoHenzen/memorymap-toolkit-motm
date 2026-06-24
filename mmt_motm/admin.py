@@ -154,5 +154,13 @@ class EventAdmin(admin.ModelAdmin):
         return obj.start_time.date() if obj.start_time else None
     get_date.short_description = "Date"
 
+
+@admin.register(EventType)
+class EventTypeAdmin(admin.ModelAdmin):
+
+    list_display = (
+        "label",
+        "category",   
+    )
+
 admin.site.register(URL)
-admin.site.register(EventType)
