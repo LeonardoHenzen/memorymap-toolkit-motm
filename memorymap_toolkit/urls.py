@@ -21,6 +21,8 @@ from django.contrib.sitemaps.views import sitemap
 from django.contrib.sitemaps import GenericSitemap
 from mmt_map.models import Point, Polygon, Line
 from mmt_pages.models import Page
+# byHen
+from mmt_motm.views import geojson_view
 
 point_dict = {
     'queryset': Point.objects.filter(published=True)
@@ -42,6 +44,10 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('mmt_map.urls')),
     path('api/', include('mmt_api.urls')),
+
+    # byHen: geodata view
+    path('geojson/', geojson_view),
+
     re_path(r'^ckeditor/', include('ckeditor_uploader.urls')),
     path('sitemap.xml', sitemap, 
         {

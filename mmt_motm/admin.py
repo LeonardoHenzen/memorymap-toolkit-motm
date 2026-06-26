@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django import forms
 from django.contrib.gis.geos import Point
+from mmt_motm.importers.geojson_export import sync_to_mm  
 
 # Register your models here.
 from .models import (
@@ -15,11 +16,29 @@ from .models import (
     RelationshipType
 )
 
+@admin.action(description="Sync selected persons to Memory Mapper")
+def sync_selected_persons(modeladmin, request, queryset):
+
+    identifiers = list(queryset.values_list("identifier", flat=True))
+
+    sync_to_mm(identifiers)
+
+@admin.action(description="Sync ALL persons to Memory Mapper")
+def sync_all_persons(modeladmin, request, queryset):
+
+    sync_to_mm()
+
+    modeladmin.message_user(
+        request,
+        "Synced ALL persons to Memory Mapper"
+    )
+
 @admin.register(Person)
 class PersonAdmin(admin.ModelAdmin):
     list_display = ("family_name", "given_name", "birth_date", "birth_place")
     search_fields = ("given_name", "family_name", "birth_place__current_name")
     ordering = ("family_name",)
+    actions = [sync_selected_persons, sync_all_persons]
 
 @admin.register(Interview)
 class InterviewAdmin(admin.ModelAdmin):
