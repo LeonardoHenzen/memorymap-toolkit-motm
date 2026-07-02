@@ -46,6 +46,7 @@ def export_geojson(identifiers=None):
             "properties": {
                 "type": "event",
                 "person": person_obj.identifier if person_obj else None,
+                "theme_name": str(person_obj) if person_obj else None,
                 "name": str(person_obj) if person_obj else None,
                 "category": e.event_type.category if e.event_type else None,
                 "event_type": e.event_type.code if e.event_type else None,
@@ -116,6 +117,7 @@ def build_lines_for_person(person, events):
                 "properties": {
                     "type": "path",
                     "person": person.identifier,
+                    "theme_name": str(person),
                     "category": cat,
                     "label": cat
                 }
@@ -128,13 +130,14 @@ def build_lines_for_person(person, events):
 def delete_person_from_mm(identifier):
 
     try:
-        theme = Theme.objects.get(name=identifier)
-    except Theme.DoesNotExist:
+        person = Person.objects.get(identifier=identifier)
+        theme = Theme.objects.get(name=str(person))
+    except (Person.DoesNotExist, Theme.DoesNotExist):
         return
 
     Point.objects.filter(theme=theme).delete()
     Line.objects.filter(theme=theme).delete()
-
+    
 # =======================================================
 # Importing geodata in MM (Theme, Points,Lines) 
 # =======================================================
@@ -163,5 +166,5 @@ def sync_person_to_mm(identifier):
         feature_title="label",
         doc_title="Event",
         fallback="Event",
-        theme="person"
+        theme="theme_name"
     )
