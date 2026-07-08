@@ -214,6 +214,7 @@ map.on('load', function() {
                 18.5, ['*', 40, ['get', 'weight']]
             ],
             'line-opacity': ["case", ["boolean", ["feature-state", "hover"], false], 0.95, ["boolean", ["feature-state", "active"], false], 0.95, 0.7],
+
         },
         'layout': {
             'line-cap': 'round'
@@ -285,6 +286,8 @@ map.on('load', function() {
         'source-layer': 'lines',
         'type': 'symbol',
         'layout': {
+            // ByHen line label not visible
+            'visibility': 'none',
             'symbol-placement': 'point',
             'text-field': ['get', 'name'],
             'text-font': [MmtMap.settings.font],
